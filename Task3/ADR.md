@@ -38,10 +38,11 @@
 | +R2   | Сайт должен поддерживать асинхронную передачу данных в другие системы                  | т.к. следует избежать прямого использования API АБС системы, а сайт должен передавать данные клиента в АБС, то следует использовать асинхронный режим передачи данных с гарантированной доставкой сообщений |
 
 ### <a name="_qmphm5d6rvi3"></a>**Решение**
-Диаграмма контекста
+[Диаграмма контекста](https://github.com/killtoyz/architecture-standart/blob/workplace/Task3/c4-context-view.puml)
 
-Диаграмма контейнеров (монолит)
-Диаграмма контейнеров (микросервисы)
+[Диаграмма контейнеров (монолит)](https://github.com/killtoyz/architecture-standart/blob/workplace/Task3/c4-container-view-monolith.puml)
+
+[Диаграмма контейнеров (микросервисы)](https://github.com/killtoyz/architecture-standart/blob/workplace/Task3/c4-container-view-microservice.puml)
 
 Самым важным мне показались следующие позиции:
 1. Не перегружать АБС, не использовать API напрямую
