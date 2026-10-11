@@ -1,0 +1,77 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+LAYOUT_TOP_DOWN()
+
+title Диаграмма контейнеров: подача заявок на депозит (MVP). ИБ — микросервисы
+
+Person(client, "Клиент", "Клиент банка")
+
+Enterprise_Boundary(bank, "Банк") {
+
+  System(site, "Сайт", "Сайт банка")
+
+  System_Boundary(ib, "ИБ (интернет-банк)") {
+    Container(ib_web, "Веб-приложение ИБ", "SPA", "Интерфейс клиента в дизайн-системе банка")
+    Container(gateway, "API Gateway", "API Gateway", "Единая точка входа: TLS, аутентификация, маршрутизация и балансировка запросов")
+
+    Container(account_svc, "Управление личным кабинетом клиента", "Микросервис", "Профиль клиента, счета")
+    ContainerDb(account_db, "БД личного кабинета", "MS SQL", "Профили и счета клиентов")
+
+    Container(catalog_svc, "Управление каталогом ставок и депозитов", "Микросервис", "Каталог депозитов, общие и персональные ставки")
+
+    Container(deposit_svc, "Управление депозитами", "Микросервис", "Приём заявок, статусы, обмен с АБС через Kafka")
+    ContainerDb(deposit_db, "БД заявок", "MS SQL", "Заявки на депозит и их статусы")
+
+    Container(sms_svc, "СМС-сервис", "Микросервис", "Коды подтверждения и СМС-уведомления")
+    ContainerDb(sms_db, "БД СМС", "MS SQL", "Коды подтверждения, журнал отправок")
+  }
+
+  SystemDb(showcase, "Витрина", "Актуальные ставки и депозиты для сайта и ИБ")
+  SystemQueue(kafka, "Kafka", "Интеграционный слой, асинхронный обмен заявками и событиями")
+
+  System(callcenter, "Колл-центр", "Система обработки заявок колл-центра")
+  System(abs, "АБС", "Автоматизированная банковская система: ставки, согласование, депозиты")
+
+  Person(cc_agent, "Сотрудник колл-центра", "Обрабатывает заявки новых клиентов с сайта")
+  Person(front_mgr, "Менеджер фронт-офиса", "Обрабатывает заявки клиентов")
+  Person(back_mgr, "Менеджер бэк-офиса", "Ведёт ставки, открывает депозиты")
+}
+
+Rel(client, site, "Подаёт заявку на депозит", "HTTPS")
+Rel(client, ib_web, "Подаёт заявку на депозит", "HTTPS")
+
+Rel(ib_web, gateway, "API-запросы", "HTTPS/REST")
+Rel(gateway, account_svc, "Профиль и счета", "REST")
+Rel(gateway, catalog_svc, "Каталог и ставки", "REST")
+Rel(gateway, deposit_svc, "Заявки на депозит", "REST")
+
+Rel(account_svc, account_db, "Читает/пишет", "SQL")
+Rel(catalog_svc, showcase, "Запрашивает актуальные данные")
+
+Rel(deposit_svc, account_svc, "Получает счета и телефон клиента", "REST")
+Rel(deposit_svc, catalog_svc, "Получает актуальную ставку", "REST")
+Rel(deposit_svc, sms_svc, "Код подтверждения, уведомления", "REST")
+Rel(deposit_svc, deposit_db, "Читает/пишет", "SQL")
+
+Rel(sms_svc, sms_db, "Читает/пишет", "SQL")
+Rel(sms_svc, client, "Шлёт СМС", "SMS")
+
+Rel(deposit_svc, kafka, "Передаёт заявку клиента")
+Rel(kafka, abs, "Передаёт заявку клиента")
+Rel(abs, kafka, "Оповещает о депозите")
+Rel(kafka, deposit_svc, "Оповещает о депозите")
+
+Rel(site, kafka, "Передаёт заявку клиента")
+Rel(kafka, callcenter, "Передаёт заявку клиента")
+Rel(callcenter, abs, "Передаёт заявку клиента")
+
+Rel(abs, showcase, "Публикует актуальные данные")
+Rel(site, showcase, "Запрашивает актуальные данные")
+
+Rel(cc_agent, callcenter, "Обрабатывает заявку клиента")
+Rel(front_mgr, abs, "Обрабатывает заявку клиента")
+Rel(back_mgr, abs, "Создаёт депозит")
+Rel(back_mgr, abs, "Уточняет ставки и депозиты")
+
+@enduml

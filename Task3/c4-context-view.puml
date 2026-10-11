@@ -1,0 +1,53 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+
+LAYOUT_TOP_DOWN()
+
+title Диаграмма контекста: подача заявок на депозит (MVP)
+
+Person(client, "Клиент", "Клиент банка")
+
+Enterprise_Boundary(bank, "Банк") {
+
+  System(site, "Сайт", "Сайт банка")
+  System(ib, "ИБ (интернет-банк)", "Каталог депозитов с персональными ставками, подача заявки")
+
+  SystemDb(showcase, "Витрина", "Актуальные ставки и депозиты для сайта и ИБ")
+  SystemQueue(kafka, "Kafka", "Интеграционный слой, асинхронный обмен заявками и событиями")
+
+  System(callcenter, "Колл-центр", "Система обработки заявок колл-центра")
+  System(abs, "АБС", "Автоматизированная банковская система: ставки, согласование, депозиты")
+
+  Person(cc_agent, "Сотрудник колл-центра", "Обрабатывает заявки новых клиентов с сайта")
+  Person(front_mgr, "Менеджер фронт-офиса", "Обрабатывает заявки клиентов")
+  Person(back_mgr, "Менеджер бэк-офиса", "Ведёт ставки, открывает депозиты")
+}
+
+
+Rel(client, site, "Подаёт заявку на депозит", "HTTPS")
+Rel(client, ib, "Подаёт заявку на депозит", "HTTPS")
+Rel(ib, client, "Шлёт СМС", "SMS")
+
+Rel(site, kafka, "Передаёт заявку клиента")
+Rel(kafka, callcenter, "Передаёт заявку клиента")
+Rel(callcenter, abs, "Передаёт заявку клиента")
+
+
+Rel(ib, kafka, "Передаёт заявку клиента")
+Rel(kafka, abs, "Передаёт заявку клиента")
+
+
+Rel(abs, kafka, "Оповещает о депозите")
+Rel(kafka, ib, "Оповещает о депозите")
+
+
+Rel(abs, showcase, "Публикует актуальные данные")
+Rel(site, showcase, "Запрашивает актуальные данные")
+Rel(ib, showcase, "Запрашивает актуальные данные")
+
+Rel(cc_agent, callcenter, "Обрабатывает заявку клиента")
+Rel(front_mgr, abs, "Обрабатывает заявку клиента")
+Rel(back_mgr, abs, "Создаёт депозит")
+Rel(back_mgr, abs, "Уточняет ставки и депозиты")
+
+@enduml

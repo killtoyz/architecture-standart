@@ -1,0 +1,59 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+LAYOUT_TOP_DOWN()
+
+title Диаграмма контейнеров: подача заявок на депозит (MVP). ИБ — монолит
+
+Person(client, "Клиент", "Клиент банка")
+
+Enterprise_Boundary(bank, "Банк") {
+
+  System(site, "Сайт", "Сайт банка")
+
+  System_Boundary(ib, "ИБ (интернет-банк)") {
+    Container(ib_web, "Веб-приложение ИБ", "Web UI", "Интерфейс клиента в дизайн-системе банка")
+    Container(ib_app, "Приложение ИБ", "Монолит, текущая платформа ИБ", "Модули: личный кабинет, каталог ставок и депозитов, заявки на депозит, СМС")
+    ContainerDb(ib_db, "БД ИБ", "MS SQL", "Клиенты, счета, заявки, коды подтверждения")
+    Container(ib_adapter, "Интеграционный адаптер", "Сервис", "Мост между ИБ и Kafka: текущая платформа ИБ несовместима с Kafka")
+  }
+
+  SystemDb(showcase, "Витрина", "Актуальные ставки и депозиты для сайта и ИБ")
+  SystemQueue(kafka, "Kafka", "Интеграционный слой, асинхронный обмен заявками и событиями")
+
+  System(callcenter, "Колл-центр", "Система обработки заявок колл-центра")
+  System(abs, "АБС", "Автоматизированная банковская система: ставки, согласование, депозиты")
+
+  Person(cc_agent, "Сотрудник колл-центра", "Обрабатывает заявки новых клиентов с сайта")
+  Person(front_mgr, "Менеджер фронт-офиса", "Обрабатывает заявки клиентов")
+  Person(back_mgr, "Менеджер бэк-офиса", "Ведёт ставки, открывает депозиты")
+}
+
+Rel(client, site, "Подаёт заявку на депозит", "HTTPS")
+Rel(client, ib_web, "Подаёт заявку на депозит", "HTTPS")
+
+Rel(ib_web, ib_app, "Запросы", "HTTPS")
+Rel(ib_app, ib_db, "Читает/пишет", "SQL")
+Rel(ib_app, showcase, "Запрашивает актуальные данные")
+Rel(ib_app, client, "Шлёт СМС", "SMS")
+
+Rel(ib_app, ib_adapter, "Передаёт заявку клиента", "REST")
+Rel(ib_adapter, kafka, "Передаёт заявку клиента")
+Rel(kafka, abs, "Передаёт заявку клиента")
+Rel(abs, kafka, "Оповещает о депозите")
+Rel(kafka, ib_adapter, "Оповещает о депозите")
+Rel(ib_adapter, ib_app, "Оповещает о депозите", "REST")
+
+Rel(site, kafka, "Передаёт заявку клиента")
+Rel(kafka, callcenter, "Передаёт заявку клиента")
+Rel(callcenter, abs, "Передаёт заявку клиента")
+
+Rel(abs, showcase, "Публикует актуальные данные")
+Rel(site, showcase, "Запрашивает актуальные данные")
+
+Rel(cc_agent, callcenter, "Обрабатывает заявку клиента")
+Rel(front_mgr, abs, "Обрабатывает заявку клиента")
+Rel(back_mgr, abs, "Создаёт депозит")
+Rel(back_mgr, abs, "Уточняет ставки и депозиты")
+
+@enduml
