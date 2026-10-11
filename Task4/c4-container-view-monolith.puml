@@ -1,0 +1,79 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+LAYOUT_TOP_DOWN()
+
+title Диаграмма контейнеров: подача заявок на депозит и доступ колл-центров к ставкам (MVP + DEP-ADR2).
+
+Person(client, "Клиент", "Клиент банка")
+
+Enterprise_Boundary(bank, "Банк") {
+
+  System(site, "Сайт", "Сайт банка")
+
+  System_Boundary(ib, "ИБ (интернет-банк)") {
+    Container(ib_web, "Веб-приложение ИБ", "Web UI", "Интерфейс клиента в дизайн-системе банка")
+    Container(ib_app, "Приложение ИБ", "Монолит, текущая платформа ИБ", "Модули: личный кабинет, каталог ставок и депозитов, заявки на депозит, СМС")
+    ContainerDb(ib_db, "БД ИБ", "MS SQL", "Клиенты, счета, заявки, коды подтверждения")
+    Container(ib_adapter, "Интеграционный адаптер", "Сервис", "Мост между ИБ и Kafka: текущая платформа ИБ несовместима с Kafka")
+  }
+
+  SystemDb(showcase, "Витрина", "Актуальные ставки и депозиты для сайта, ИБ, колл-центра и сервиса выгрузки")
+  SystemQueue(kafka, "Kafka", "Интеграционный слой, асинхронный обмен заявками и событиями")
+
+  System(callcenter, "Колл-центр", "Система обработки заявок колл-центра; экран актуальных ставок")
+  System(abs, "АБС", "Автоматизированная банковская система: ставки, согласование, депозиты")
+
+  Container(export_svc, "Сервис выгрузки ставок", "Микросервис, Kubernetes", "По событию изменения ставок берёт полный срез из витрины")
+
+  System(sftp, "SFTP-сервер", "Файловый обмен с партнёрами")
+
+  Person(cc_agent, "Сотрудник колл-центра", "Обрабатывает заявки новых клиентов с сайта, консультирует по ставкам")
+  Person(front_mgr, "Менеджер фронт-офиса", "Обрабатывает заявки клиентов")
+  Person(back_mgr, "Менеджер бэк-офиса", "Ведёт ставки, открывает депозиты")
+}
+
+System_Ext(partner_cc, "Партнёрский колл-центр", "Внешняя ИС партнёра; получает ставки только файлами")
+Person_Ext(partner_agent, "Сотрудник партнёрского колл-центра", "Консультирует клиентов по ставкам при перегрузке КЦ банка")
+
+Rel(client, site, "Подаёт заявку на депозит", "HTTPS")
+Rel(client, ib_web, "Подаёт заявку на депозит", "HTTPS")
+
+Rel(ib_web, ib_app, "Запросы", "HTTPS")
+Rel(ib_app, ib_db, "Читает/пишет", "SQL")
+Rel(ib_app, showcase, "Запрашивает актуальные данные")
+Rel(ib_app, client, "Шлёт СМС", "SMS")
+
+Rel(ib_app, ib_adapter, "Передаёт заявку клиента", "REST")
+Rel(ib_adapter, kafka, "Передаёт заявку клиента")
+Rel(kafka, abs, "Передаёт заявку клиента")
+Rel(abs, kafka, "Оповещает о депозите")
+Rel(kafka, ib_adapter, "Оповещает о депозите")
+Rel(ib_adapter, ib_app, "Оповещает о депозите", "REST")
+
+Rel(site, kafka, "Передаёт заявку клиента")
+Rel(kafka, callcenter, "Передаёт заявку клиента")
+Rel(callcenter, abs, "Передаёт заявку клиента")
+
+Rel(abs, showcase, "Публикует актуальные данные")
+Rel(site, showcase, "Запрашивает актуальные данные")
+
+Rel(cc_agent, callcenter, "Обрабатывает заявку клиента")
+Rel(front_mgr, abs, "Обрабатывает заявку клиента")
+Rel(back_mgr, abs, "Создаёт депозит")
+Rel(back_mgr, abs, "Уточняет ставки и депозиты")
+
+Rel(client, cc_agent, "Звонит уточнить условия депозита", "Телефон")
+Rel(cc_agent, callcenter, "Смотрит актуальные ставки")
+Rel(callcenter, showcase, "Запрашивает актуальные ставки", "HTTPS/REST")
+
+Rel(abs, kafka, "Публикует событие изменения ставок")
+Rel(kafka, export_svc, "Событие изменения ставок")
+Rel(export_svc, showcase, "Запрашивает полный срез общих ставок", "HTTPS/REST")
+Rel(export_svc, sftp, "Публикует файл со ставками", "SFTP")
+Rel(partner_cc, sftp, "Забирает файл со ставками", "SFTP")
+Rel(client, partner_agent, "Звонит при перегрузке КЦ банка", "Телефон")
+Rel(partner_agent, partner_cc, "Смотрит актуальные ставки")
+
+SHOW_LEGEND()
+@enduml
